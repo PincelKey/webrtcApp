@@ -1,0 +1,357 @@
+<html>
+<head>
+	<title></title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+	<link rel="stylesheet" type="text/css" href="">
+	<style type="text/css">
+
+		*{
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		body{
+			font-family: "Roboto";
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+		}
+
+		#con-main{
+			background: #EDEDED;
+			border: solid 1px #0251FA ;
+			box-shadow: rgba(2, 81, 250, 0.3) 0px 0px 0px 5px;
+			border-radius: 5px;
+			width: 90%;
+			height: 70vh;
+		}
+
+		#entrada{
+			width: 100%;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;			
+		}
+		#entrada > form{
+			width: 50%;
+		}
+		#entrada > form{
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-wrap: wrap;
+		}
+		#entrada > form > input,
+		#entrada > form > textarea{
+			width: 60%;
+			padding: 5px;
+			border: solid 1px #555;
+			border-radius: 3.5px;
+			margin: 5px auto;
+		}
+
+		#entrada > form > button{
+			width: 30%;
+			padding: 3.5px;
+			margin: 5px auto;
+			cursor: pointer;
+		}
+
+		#inboxRead{
+			margin: 10px;
+			height: 60%;
+			overflow: auto;
+		}
+
+		.message,.myMessage{
+			font-size: 0.9em;
+			display: flex;
+			justify-content: space-between;
+			padding: 3.5px;
+			margin-bottom: 5px;
+			background: #fff;
+			border-radius: 5px;
+		}
+		.user{
+			padding: 3px 10px;
+		}
+
+		.message > .user{
+			color: #3504B3 ;
+			font-weight: 500;
+		}
+
+		.message > .content{
+			background: #3504B3 ;
+			padding: 10px;
+			border-radius: 5px;
+			color: #fff;
+		}
+
+		.myMessage > .user{
+			color: #333 ;
+			font-weight: 500;
+		}
+
+		.myMessage > .content{
+			padding: 10px;
+			border-radius: 5px;
+			color: #444;			
+		}
+	</style>
+</head>
+<body>
+	<div id="con-main">
+		<div id="entrada">
+			<form id="userForm" action="">
+				<input id="user" placeholder="Ingrese su ID"></input>
+				<button id="setUser">LOGIN</button>
+			</form>
+			<form id="contactForm" action="">
+				<input id="contact" placeholder="Ingrese ID del contacto"></input>
+				<button id="doContact">CONTACT</button>
+			</form>
+			<form id="messageForm" action="">
+				<textarea id="inboxWrite"></textarea>
+				<button id="sendMessage">SEND</button>
+			</form>
+		</div>
+		<div id="inboxRead">				
+		</div>
+	</div>
+	<script type="text/javascript">
+		function insertMessage(classNode,user,content){
+
+			var chMessage = document.createElement("div");
+			chMessage.setAttribute("class",classNode);
+
+			var chContent = document.createElement("p");
+			chContent.setAttribute("class","content");
+			chContent.appendChild(document.createTextNode(content))
+
+			var chUser = document.createElement("p");
+			chUser.setAttribute("class","user");
+			chUser.appendChild(document.createTextNode(user))
+
+			if(classNode=="message"){
+				chMessage.appendChild(chUser);
+				chMessage.appendChild(chContent); 	
+			}else if(classNode=="myMessage"){
+				chMessage.appendChild(chContent); 
+				chMessage.appendChild(chUser);				
+			}
+
+			document.querySelector("#inboxRead").
+					appendChild(chMessage);	
+
+		}
+		/***************Real Time***********/
+			var portAux = 615;
+			//var ws=null;
+			//Conecto a SERVER
+			var wSocket = new WebSocket("ws://127.0.0.1:"+portAux);
+
+			//Eventos en mi socket
+			wSocket.onopen=function(event){
+				console.log("Cliente abierto");
+			};
+
+			wSocket.onclose=function(event){
+				console.log("Cliente cerrado");
+			};
+
+			wSocket.onmessage=function(msg){
+				var message = JSON.parse(msg.data);
+
+				console.log("NEW !!! Message: "+message.from+" --> "+message.to+" action: "+message.action);
+
+				if(message.to==user)
+					switch(message.action){
+						case "offer":
+							contact=message.from; //Definir mi contacto a responder
+							processOffer(message.data);
+							break;
+						case "answer":
+							processAnswer(message.data);
+							break;
+						case "candidate":
+							processCandidate(message.data);
+							break;
+					}		
+			};		
+
+			wSocket.onerror=function(error){
+				console.log("Error: "+error);
+			};				
+			/***********************************/
+		//Se viene el RETO :3
+
+		//VARIABLES GLOBALES
+			//vars - user
+			var user, contact, message; 
+			//vars - comunication
+			var config={"iceServers":[{"url":"stun:stun.l.google.com:19302"}]},
+				connection={}, peerConnection, dataChannel;
+
+			//Entradas
+			var txtUser=document.querySelector("#user"), 
+				txtContact=document.querySelector("#contact"), 
+				txtInboxWrite=document.querySelector("#inboxWrite");
+
+			//Botones
+			var btnSetUser=document.querySelector("#setUser"), 
+				btnDoContact=document.querySelector("#doContact"), 
+				btnSendMessage=document.querySelector("#sendMessage");			
+			
+		//Ocultar mis entradas
+			document.querySelector("#contactForm").style="display: none";
+			document.querySelector("#messageForm").style="display: none";
+
+		//Funciones
+			btnSetUser.addEventListener("click",setUser,false);
+			btnDoContact.addEventListener("click",doContact,false);
+			btnSendMessage.addEventListener("click",sendMessage,false);
+
+			function setUser(event){
+				event.preventDefault();
+				//Obtenemos el ID
+				user=document.querySelector("#user").value;
+				//Mostramos el siguiente FORMULARIO - Contacto
+				document.querySelector("#contactForm").style="display: run-in";
+			}
+
+			function doContact(event){
+				event.preventDefault();
+				//Obtenemos el ID del contacto
+				contact=document.querySelector("#contact").value;
+
+				openDataChannel();
+
+				//Crear y enviar la oferta
+		        var sdpConstraints = { 'mandatory':
+		            {
+		                'OfferToReceiveAudio': false,
+		                'OfferToReceiveVideo': false
+		            }
+		        };
+
+				peerConnection.createOffer(sdpConstraints).then(function(sdp){
+					peerConnection.setLocalDescription(sdp);
+					sendNegotiation("offer",sdp);
+					console.log("------ SEND OFFER ------");
+				},function(error){
+					console.log(error);
+				});
+
+			}
+
+			function sendMessage(event){
+				event.preventDefault();
+				message = txtInboxWrite.value;
+
+				dataChannel.send(message);
+
+				//Mostrarlo en nuestro  inbox el mensaje
+				insertMessage("myMessage",user,message);				
+			}
+
+			//-------------------------------------------------------------------
+			function openDataChannel(){
+				//1. Crear nuestro punto de conexión - peerConnection
+					peerConnection = new webkitRTCPeerConnection(config,connection);
+					peerConnection.onicecandidate=function(event){
+						console.log("Hay un candidate");
+						//Verificar si no hay errores
+						if(!peerConnection || !event || !event.candidate) return;
+
+            			sendNegotiation("candidate", event.candidate);
+					}
+					peerConnection.ondatachannel=function(event){
+						//En este contexto vemos el flujo de datos y eventos A---------------------B
+						event.channel.onopen=function(){
+							console.log("Canal de datos establecido y listo para usarse")
+						}
+						event.channel.onmessage=function(message){
+							console.log("NEW MESSAGE en el canal de datos!!!")
+							//Mostrarlo en nuestro  inbox el mensaje
+							insertMessage("message",contact,message.data);		
+						}
+					}						
+				//2. Establecer un canal de datos y ver sus eventos
+					//2.1 Creacion del canal de datos
+					dataChannel = peerConnection.createDataChannel("datachannel",{reliable: false});
+					//2.2 Eventos del canal de datos
+					dataChannel.onopen=function(){
+			            console.log("------ DATACHANNEL OPENED ------")
+
+						//Mostramos el siguiente FORMULARIO - Message
+						document.querySelector("#messageForm").style="display: run-in";
+					}
+					dataChannel.onclose=function(){
+						 console.log("------ DATACHANNEL CLOSED ------")
+					}
+					dataChannel.onerror=function(error){
+						console.log("Error en el canal de datos: "+error);
+					}													
+			}
+
+			function sendNegotiation(type, sdp){
+				//Creamos nuestro mensaje a enviar
+				var negociacion = {from: user, to: contact, action: type, data: sdp};
+
+				//Eviamos a traves de nuestro medio de comunicacion
+				wSocket.send(JSON.stringify(negociacion));
+				console.log("Negociando entre FROM: "+user+" -> TO: "+contact+" action: "+type);
+			}
+
+		    function getURLParameter(name) {
+		        return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null
+		    }
+
+
+
+			function processCandidate(iceCandidate){
+				peerConnection.addIceCandidate(new RTCIceCandidate(iceCandidate)).catch(function(error){
+					debugger;
+					console.log("ERROR IceCandidate: "+error);
+				});
+				console.log("------ PROCESSED CANDIDATE ------");
+			}
+
+			function processOffer(offer){
+
+				openDataChannel();
+
+				peerConnection.setRemoteDescription(new RTCSessionDescription(offer)).catch(function(error){
+					console.log("ERROR offer: "+error);
+				});
+
+				//Crear y enviar la respuesta
+		        var sdpConstraints = {'mandatory':
+		            {
+		                'OfferToReceiveAudio': false,
+		                'OfferToReceiveVideo': false
+		            }
+		        };
+
+				peerConnection.createAnswer(sdpConstraints).then(function(sdp){
+					peerConnection.setLocalDescription(sdp);
+					sendNegotiation("answer",sdp);
+					console.log("------ SEND ANSWER ------");
+				},function(error){
+					console.log(error);
+				});
+
+				console.log("------ PROCESSED OFFER ------");
+			}
+
+			function processAnswer(answer){
+				peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+				console.log("------ PROCESSED ANSWER ------");
+			}
+	</script>
+</body>
+</html>
